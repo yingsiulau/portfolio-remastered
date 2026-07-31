@@ -1,5 +1,3 @@
-const db = globalThis.__B44_DB__ || { auth:{ isAuthenticated: async()=>false, me: async()=>null }, entities:new Proxy({}, { get:()=>({ filter:async()=>[], get:async()=>null, create:async()=>({}), update:async()=>({}), delete:async()=>({}) }) }), integrations:{ Core:{ UploadFile:async()=>({ file_url:'' }) } } };
-
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
@@ -17,12 +15,9 @@ export default function InquirySheet({ open, onClose }) {
     if (!name || !email || !details) return;
     setSending(true);
     try {
-      const { base44 } = await import('@/api/base44Client');
-      await db.integrations.Core.SendEmail({
-        to: 'yingsiulauart.wordpress.com',
-        subject: `New Inquiry from ${name}`,
-        body: `Name: ${name}\nEmail: ${email}\n\nProject Details:\n${details}`,
-      });
+      // Local mock: no backend to send this to, just simulate the round trip.
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      console.log('[mock] Studio inquiry submitted:', { name, email, details });
       toast({ title: 'Connection initiated', description: "I'll be in touch soon." });
       setName('');
       setEmail('');
