@@ -57,22 +57,25 @@ const ThermalShader = {
     uniform sampler2D tDiffuse;
     varying vec2 vUv;
 
+    // Cool colors (navy/blue/cyan) are compressed into the bottom ~1/4 of
+    // the range and warm colors (yellow/orange/red/pink) get the rest, so
+    // the image reads as mostly warm instead of mostly blue.
     vec3 thermalColor(float t) {
       t = clamp(t, 0.0, 1.0);
-      if (t < 0.15) {
-        return mix(vec3(0.04, 0.06, 0.31), vec3(0.10, 0.23, 0.84), t / 0.15);
-      } else if (t < 0.32) {
-        return mix(vec3(0.10, 0.23, 0.84), vec3(0.0, 0.85, 0.82), (t - 0.15) / 0.17);
-      } else if (t < 0.48) {
-        return mix(vec3(0.0, 0.85, 0.82), vec3(0.24, 0.95, 0.16), (t - 0.32) / 0.16);
-      } else if (t < 0.62) {
-        return mix(vec3(0.24, 0.95, 0.16), vec3(0.96, 0.93, 0.0), (t - 0.48) / 0.14);
+      if (t < 0.08) {
+        return mix(vec3(0.04, 0.06, 0.31), vec3(0.10, 0.23, 0.84), t / 0.08);
+      } else if (t < 0.16) {
+        return mix(vec3(0.10, 0.23, 0.84), vec3(0.0, 0.85, 0.82), (t - 0.08) / 0.08);
+      } else if (t < 0.26) {
+        return mix(vec3(0.0, 0.85, 0.82), vec3(0.24, 0.95, 0.16), (t - 0.16) / 0.10);
+      } else if (t < 0.38) {
+        return mix(vec3(0.24, 0.95, 0.16), vec3(0.96, 0.93, 0.0), (t - 0.26) / 0.12);
+      } else if (t < 0.55) {
+        return mix(vec3(0.96, 0.93, 0.0), vec3(1.0, 0.54, 0.0), (t - 0.38) / 0.17);
       } else if (t < 0.75) {
-        return mix(vec3(0.96, 0.93, 0.0), vec3(1.0, 0.54, 0.0), (t - 0.62) / 0.13);
-      } else if (t < 0.85) {
-        return mix(vec3(1.0, 0.54, 0.0), vec3(1.0, 0.16, 0.12), (t - 0.75) / 0.10);
+        return mix(vec3(1.0, 0.54, 0.0), vec3(1.0, 0.16, 0.12), (t - 0.55) / 0.20);
       }
-      return mix(vec3(1.0, 0.16, 0.12), vec3(1.0, 0.37, 0.84), (t - 0.85) / 0.15);
+      return mix(vec3(1.0, 0.16, 0.12), vec3(1.0, 0.37, 0.84), (t - 0.75) / 0.25);
     }
 
     void main() {
@@ -80,8 +83,8 @@ const ThermalShader = {
       float lum = dot(texel.rgb, vec3(0.299, 0.587, 0.114));
       // The scene's lighting rarely pushes surfaces past mid brightness,
       // which would flatten everything into the cold end of the ramp —
-      // boost and gamma-correct so highlights still reach yellow/pink.
-      lum = pow(clamp(lum * 2.2, 0.0, 1.0), 0.75);
+      // boost and gamma-correct so highlights still reach yellow/orange/red.
+      lum = pow(clamp(lum * 2.8, 0.0, 1.0), 0.55);
       gl_FragColor = vec4(thermalColor(lum), 1.0);
     }
   `,
