@@ -12,12 +12,19 @@ import { AsciiEffect } from 'three/examples/jsm/effects/AsciiEffect.js';
 
 export const FILTERS = ['none', 'ascii', 'pixel', 'duotone', 'thermal'];
 
-// Maps scene luminance onto the site's two brand colors.
+// "Starboy"-style duotone: a solid red backdrop with the subject toned
+// navy-to-blue by luminance. Background and subject need separate colors
+// (not just two luminance extremes), since the backdrop should read as a
+// flat red regardless of how dark the subject's shadows get — so this
+// uses alpha (opaque mesh vs. transparent background) to pick between
+// them, then forces full opacity so the "background" is actually painted
+// rather than staying transparent over the page's own dark background.
 const DuotoneShader = {
   uniforms: {
     tDiffuse: { value: null },
-    colorDark: { value: new THREE.Color(0x1a1a1a) },
-    colorLight: { value: new THREE.Color(0x4d4dff) },
+    colorDark: { value: new THREE.Color(0x0b1526) },
+    colorLight: { value: new THREE.Color(0x3b82d6) },
+    colorBg: { value: new THREE.Color(0xdc2b1e) },
   },
   vertexShader: `
     varying vec2 vUv;
@@ -30,11 +37,13 @@ const DuotoneShader = {
     uniform sampler2D tDiffuse;
     uniform vec3 colorDark;
     uniform vec3 colorLight;
+    uniform vec3 colorBg;
     varying vec2 vUv;
     void main() {
       vec4 texel = texture2D(tDiffuse, vUv);
       float lum = dot(texel.rgb, vec3(0.299, 0.587, 0.114));
-      gl_FragColor = vec4(mix(colorDark, colorLight, lum), texel.a);
+      vec3 subject = mix(colorDark, colorLight, lum);
+      gl_FragColor = vec4(mix(colorBg, subject, texel.a), 1.0);
     }
   `,
 };
