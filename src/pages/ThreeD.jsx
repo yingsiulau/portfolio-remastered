@@ -1,11 +1,21 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Nav from '@/components/portfolio/Nav';
-import ModelViewer from '@/components/portfolio/ModelViewer';
+import ModelViewer, { FILTERS } from '@/components/portfolio/ModelViewer';
 
 const MODEL_SRC = `${import.meta.env.BASE_URL}models/tripo_pbr_model_b8775148-5339-45b5-ba6f-bb4304f2cbe7_meshopt.glb`;
 // Placeholder test upload — not the Akihabara Polycam scan.
 
+const FILTER_LABELS = {
+  none: 'None',
+  ascii: 'ASCII',
+  pixel: '8-bit',
+  duotone: 'Duotone',
+};
+
 export default function ThreeD() {
+  const [filter, setFilter] = useState('none');
+
   return (
     <div className="relative min-h-screen w-full bg-[#1A1A1A] text-white font-body overflow-x-clip antialiased">
       <Nav />
@@ -23,20 +33,39 @@ export default function ThreeD() {
           </Link>
         </div>
 
-        <div className="mb-8">
-          <span className="text-xs font-mono text-[#4D4DFF] uppercase tracking-widest block mb-3">
-            // TEST MODEL
-          </span>
-          <h1 className="text-4xl md:text-6xl font-display font-light leading-tight tracking-tight mb-3">
-            <span className="italic">Test</span>
-          </h1>
-          <p className="text-sm text-white/50 font-light">
-            Placeholder upload for the /3d viewer. Drag to orbit, scroll to zoom.
-          </p>
+        <div className="mb-8 flex flex-wrap items-end justify-between gap-6">
+          <div>
+            <span className="text-xs font-mono text-[#4D4DFF] uppercase tracking-widest block mb-3">
+              // TEST MODEL
+            </span>
+            <h1 className="text-4xl md:text-6xl font-display font-light leading-tight tracking-tight mb-3">
+              <span className="italic">Test</span>
+            </h1>
+            <p className="text-sm text-white/50 font-light">
+              Placeholder upload for the /3d viewer. Drag to orbit, scroll to zoom.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {FILTERS.map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setFilter(f)}
+                className={`text-[10px] font-mono uppercase tracking-widest px-3 py-2 rounded-full border transition-colors ${
+                  filter === f
+                    ? 'border-[#4D4DFF] text-[#4D4DFF] bg-[#4D4DFF]/10'
+                    : 'border-white/15 text-white/50 hover:text-white hover:border-white/40'
+                }`}
+              >
+                {FILTER_LABELS[f]}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="relative flex-1 min-h-[60vh] rounded-2xl border border-white/10 overflow-hidden bg-[#101014]">
-          <ModelViewer src={MODEL_SRC} />
+          <ModelViewer src={MODEL_SRC} filter={filter} />
         </div>
       </main>
     </div>

@@ -3,16 +3,58 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { RenderPixelatedPass } from 'three/examples/jsm/postprocessing/RenderPixelatedPass.js';
+import { AsciiEffect } from 'three/examples/jsm/effects/AsciiEffect.js';
+
+export const FILTERS = ['none', 'ascii', 'pixel', 'duotone'];
+
+// Maps scene luminance onto the site's two brand colors.
+const DuotoneShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    colorDark: { value: new THREE.Color(0x1a1a1a) },
+    colorLight: { value: new THREE.Color(0x4d4dff) },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform vec3 colorDark;
+    uniform vec3 colorLight;
+    varying vec2 vUv;
+    void main() {
+      vec4 texel = texture2D(tDiffuse, vUv);
+      float lum = dot(texel.rgb, vec3(0.299, 0.587, 0.114));
+      gl_FragColor = vec4(mix(colorDark, colorLight, lum), texel.a);
+    }
+  `,
+};
 
 /**
  * Loads and frames a glTF/GLB model (e.g. a Polycam export) in an
  * orbit-controlled Three.js scene. Falls back to a placeholder mesh
  * with an instructive message when the model file isn't there yet.
+ * `filter` swaps the render pipeline between a few stylized looks —
+ * see FILTERS above.
  */
-export default function ModelViewer({ src }) {
+export default function ModelViewer({ src, filter = 'none' }) {
   const containerRef = useRef(null);
   const [status, setStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
   const [progress, setProgress] = useState(0);
+  const filterRef = useRef(filter);
+
+  useEffect(() => {
+    filterRef.current = filter;
+  }, [filter]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -33,6 +75,9 @@ export default function ModelViewer({ src }) {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
 
+    // OrbitControls always listens on the WebGL canvas — even in ASCII
+    // mode, where that canvas is kept in the DOM at opacity 0 so pointer
+    // events still land on it underneath the (pointer-events: none) text.
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
@@ -47,6 +92,43 @@ export default function ModelViewer({ src }) {
     const rimLight = new THREE.DirectionalLight(0x4d4dff, 0.6);
     rimLight.position.set(-6, 2, -4);
     scene.add(rimLight);
+
+    // ---- Render pipelines, one per filter ----
+    const composerNone = new EffectComposer(renderer);
+    composerNone.addPass(new RenderPass(scene, camera));
+    composerNone.addPass(new OutputPass());
+
+    const pixelPass = new RenderPixelatedPass(6, scene, camera);
+    const composerPixel = new EffectComposer(renderer);
+    composerPixel.addPass(pixelPass);
+    composerPixel.addPass(new OutputPass());
+
+    const duotonePass = new ShaderPass(DuotoneShader);
+    const composerDuotone = new EffectComposer(renderer);
+    composerDuotone.addPass(new RenderPass(scene, camera));
+    composerDuotone.addPass(duotonePass);
+    composerDuotone.addPass(new OutputPass());
+
+    const composers = {
+      none: composerNone,
+      pixel: composerPixel,
+      duotone: composerDuotone,
+    };
+
+    // No `invert`: AsciiEffect already forces fully-transparent (alpha 0)
+    // background pixels to render as blank space, so leaving it off keeps
+    // that background empty and maps dark model surfaces to dense chars.
+    const asciiEffect = new AsciiEffect(renderer, ' .:-+*=%@#', { resolution: 0.18 });
+    asciiEffect.setSize(container.clientWidth, container.clientHeight);
+    Object.assign(asciiEffect.domElement.style, {
+      position: 'absolute',
+      inset: '0',
+      overflow: 'hidden',
+      pointerEvents: 'none',
+      backgroundColor: 'transparent',
+      color: '#4D4DFF',
+    });
+    container.appendChild(asciiEffect.domElement);
 
     let disposables = [];
     let placeholder = null;
@@ -116,15 +198,28 @@ export default function ModelViewer({ src }) {
         placeholder.rotation.x += 0.0015;
       }
       controls.update();
-      renderer.render(scene, camera);
+
+      const active = filterRef.current;
+      const isAscii = active === 'ascii';
+      renderer.domElement.style.opacity = isAscii ? '0' : '1';
+      asciiEffect.domElement.style.visibility = isAscii ? 'visible' : 'hidden';
+
+      if (isAscii) {
+        asciiEffect.render(scene, camera);
+      } else {
+        (composers[active] || composerNone).render();
+      }
     };
     animate();
 
     const onResize = () => {
       if (!container) return;
-      camera.aspect = container.clientWidth / container.clientHeight;
+      const { clientWidth: w, clientHeight: h } = container;
+      camera.aspect = w / h;
       camera.updateProjectionMatrix();
-      renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.setSize(w, h);
+      Object.values(composers).forEach((c) => c.setSize(w, h));
+      asciiEffect.setSize(w, h);
     };
     window.addEventListener('resize', onResize);
 
@@ -132,9 +227,13 @@ export default function ModelViewer({ src }) {
       cancelAnimationFrame(frameId);
       window.removeEventListener('resize', onResize);
       controls.dispose();
+      if (asciiEffect.domElement.parentNode === container) {
+        container.removeChild(asciiEffect.domElement);
+      }
       if (renderer.domElement.parentNode === container) {
         container.removeChild(renderer.domElement);
       }
+      Object.values(composers).forEach((c) => c.dispose());
       renderer.dispose();
       disposables.forEach((d) => d.dispose());
       if (loadedRoot) {
