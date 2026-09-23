@@ -10,7 +10,31 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { RenderPixelatedPass } from 'three/examples/jsm/postprocessing/RenderPixelatedPass.js';
 import { AsciiEffect } from 'three/examples/jsm/effects/AsciiEffect.js';
 
-export const FILTERS = ['none', 'ascii', 'pixel', 'duotone', 'thermal'];
+export const FILTERS = ['none', 'ascii', 'pixel', 'duotone', 'thermal', 'invert'];
+
+// Plain color negative. Forces full opacity so the transparent background
+// (black) inverts to white too, like a photographic negative, rather than
+// staying transparent over the page's own dark background.
+const InvertShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    varying vec2 vUv;
+    void main() {
+      vec4 texel = texture2D(tDiffuse, vUv);
+      gl_FragColor = vec4(1.0 - texel.rgb, 1.0);
+    }
+  `,
+};
 
 // High-contrast black & white duotone on a flat dark gray backdrop.
 // Background and subject need separate colors (not just two luminance
@@ -179,11 +203,18 @@ export default function ModelViewer({ src, filter = 'none' }) {
     composerThermal.addPass(thermalPass);
     composerThermal.addPass(new OutputPass());
 
+    const invertPass = new ShaderPass(InvertShader);
+    const composerInvert = new EffectComposer(renderer);
+    composerInvert.addPass(new RenderPass(scene, camera));
+    composerInvert.addPass(invertPass);
+    composerInvert.addPass(new OutputPass());
+
     const composers = {
       none: composerNone,
       pixel: composerPixel,
       duotone: composerDuotone,
       thermal: composerThermal,
+      invert: composerInvert,
     };
 
     // No `invert`: AsciiEffect already forces fully-transparent (alpha 0)

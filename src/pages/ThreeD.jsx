@@ -12,6 +12,7 @@ const FILTER_LABELS = {
   pixel: '8-bit',
   duotone: 'Duotone',
   thermal: 'Brockhampton',
+  invert: 'Invert',
 };
 
 export default function ThreeD() {
