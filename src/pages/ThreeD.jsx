@@ -11,6 +11,7 @@ const FILTER_LABELS = {
   ascii: 'ASCII',
   pixel: '8-bit',
   duotone: 'Duotone',
+  thermal: 'Brockhampton',
 };
 
 export default function ThreeD() {

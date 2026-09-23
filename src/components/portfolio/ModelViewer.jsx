@@ -10,7 +10,7 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { RenderPixelatedPass } from 'three/examples/jsm/postprocessing/RenderPixelatedPass.js';
 import { AsciiEffect } from 'three/examples/jsm/effects/AsciiEffect.js';
 
-export const FILTERS = ['none', 'ascii', 'pixel', 'duotone'];
+export const FILTERS = ['none', 'ascii', 'pixel', 'duotone', 'thermal'];
 
 // Maps scene luminance onto the site's two brand colors.
 const DuotoneShader = {
@@ -35,6 +35,54 @@ const DuotoneShader = {
       vec4 texel = texture2D(tDiffuse, vUv);
       float lum = dot(texel.rgb, vec3(0.299, 0.587, 0.114));
       gl_FragColor = vec4(mix(colorDark, colorLight, lum), texel.a);
+    }
+  `,
+};
+
+// Thermal-camera style rainbow LUT (navy → blue → cyan → green → yellow →
+// orange → red → pink), keyed off scene luminance. Forces full opacity so
+// the background paints solid navy instead of staying transparent.
+const ThermalShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    varying vec2 vUv;
+
+    vec3 thermalColor(float t) {
+      t = clamp(t, 0.0, 1.0);
+      if (t < 0.15) {
+        return mix(vec3(0.04, 0.06, 0.31), vec3(0.10, 0.23, 0.84), t / 0.15);
+      } else if (t < 0.32) {
+        return mix(vec3(0.10, 0.23, 0.84), vec3(0.0, 0.85, 0.82), (t - 0.15) / 0.17);
+      } else if (t < 0.48) {
+        return mix(vec3(0.0, 0.85, 0.82), vec3(0.24, 0.95, 0.16), (t - 0.32) / 0.16);
+      } else if (t < 0.62) {
+        return mix(vec3(0.24, 0.95, 0.16), vec3(0.96, 0.93, 0.0), (t - 0.48) / 0.14);
+      } else if (t < 0.75) {
+        return mix(vec3(0.96, 0.93, 0.0), vec3(1.0, 0.54, 0.0), (t - 0.62) / 0.13);
+      } else if (t < 0.85) {
+        return mix(vec3(1.0, 0.54, 0.0), vec3(1.0, 0.16, 0.12), (t - 0.75) / 0.10);
+      }
+      return mix(vec3(1.0, 0.16, 0.12), vec3(1.0, 0.37, 0.84), (t - 0.85) / 0.15);
+    }
+
+    void main() {
+      vec4 texel = texture2D(tDiffuse, vUv);
+      float lum = dot(texel.rgb, vec3(0.299, 0.587, 0.114));
+      // The scene's lighting rarely pushes surfaces past mid brightness,
+      // which would flatten everything into the cold end of the ramp —
+      // boost and gamma-correct so highlights still reach yellow/pink.
+      lum = pow(clamp(lum * 2.2, 0.0, 1.0), 0.75);
+      gl_FragColor = vec4(thermalColor(lum), 1.0);
     }
   `,
 };
@@ -109,10 +157,17 @@ export default function ModelViewer({ src, filter = 'none' }) {
     composerDuotone.addPass(duotonePass);
     composerDuotone.addPass(new OutputPass());
 
+    const thermalPass = new ShaderPass(ThermalShader);
+    const composerThermal = new EffectComposer(renderer);
+    composerThermal.addPass(new RenderPass(scene, camera));
+    composerThermal.addPass(thermalPass);
+    composerThermal.addPass(new OutputPass());
+
     const composers = {
       none: composerNone,
       pixel: composerPixel,
       duotone: composerDuotone,
+      thermal: composerThermal,
     };
 
     // No `invert`: AsciiEffect already forces fully-transparent (alpha 0)
