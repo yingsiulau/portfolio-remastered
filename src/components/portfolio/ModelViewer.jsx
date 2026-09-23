@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 
 /**
  * Loads and frames a glTF/GLB model (e.g. a Polycam export) in an
@@ -85,6 +86,7 @@ export default function ModelViewer({ src }) {
 
     if (src) {
       const loader = new GLTFLoader();
+      loader.setMeshoptDecoder(MeshoptDecoder);
       loader.load(
         src,
         (gltf) => {
@@ -96,7 +98,8 @@ export default function ModelViewer({ src }) {
         (event) => {
           if (event.total) setProgress(Math.round((event.loaded / event.total) * 100));
         },
-        () => {
+        (err) => {
+          console.error('Failed to load model:', src, err);
           addPlaceholder();
           setStatus('error');
         }

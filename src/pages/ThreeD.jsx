@@ -2,7 +2,8 @@ import { Link } from 'react-router-dom';
 import Nav from '@/components/portfolio/Nav';
 import ModelViewer from '@/components/portfolio/ModelViewer';
 
-const MODEL_SRC = `${import.meta.env.BASE_URL}models/alley-akihabara.glb`;
+const MODEL_SRC = `${import.meta.env.BASE_URL}models/tripo_pbr_model_b8775148-5339-45b5-ba6f-bb4304f2cbe7_meshopt.glb`;
+// Placeholder test upload — not the Akihabara Polycam scan.
 
 export default function ThreeD() {
   return (
@@ -24,22 +25,13 @@ export default function ThreeD() {
 
         <div className="mb-8">
           <span className="text-xs font-mono text-[#4D4DFF] uppercase tracking-widest block mb-3">
-            // 3D SCAN
+            // TEST MODEL
           </span>
           <h1 className="text-4xl md:text-6xl font-display font-light leading-tight tracking-tight mb-3">
-            Some Alley <span className="italic">in Akihabara</span>
+            <span className="italic">Test</span>
           </h1>
           <p className="text-sm text-white/50 font-light">
-            Photogrammetry scan captured with{' '}
-            <a
-              href="https://poly.cam/capture/25E9E812-DE39-4101-BE33-D2243E08F849"
-              target="_blank"
-              rel="noreferrer"
-              className="underline hover:text-[#4D4DFF] transition-colors"
-            >
-              Polycam
-            </a>
-            . Drag to orbit, scroll to zoom.
+            Placeholder upload for the /3d viewer. Drag to orbit, scroll to zoom.
           </p>
         </div>
 
