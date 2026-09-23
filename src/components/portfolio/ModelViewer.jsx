@@ -12,19 +12,19 @@ import { AsciiEffect } from 'three/examples/jsm/effects/AsciiEffect.js';
 
 export const FILTERS = ['none', 'ascii', 'pixel', 'duotone', 'thermal'];
 
-// "Starboy"-style duotone: a solid red backdrop with the subject toned
-// navy-to-blue by luminance. Background and subject need separate colors
-// (not just two luminance extremes), since the backdrop should read as a
-// flat red regardless of how dark the subject's shadows get — so this
-// uses alpha (opaque mesh vs. transparent background) to pick between
-// them, then forces full opacity so the "background" is actually painted
-// rather than staying transparent over the page's own dark background.
+// High-contrast black & white duotone on a flat dark gray backdrop.
+// Background and subject need separate colors (not just two luminance
+// extremes), since the backdrop should stay a neutral gray regardless of
+// how dark the subject's shadows crush to black — so this uses alpha
+// (opaque mesh vs. transparent background) to pick between them, then
+// forces full opacity so the "background" is actually painted rather
+// than staying transparent over the page's own dark background.
 const DuotoneShader = {
   uniforms: {
     tDiffuse: { value: null },
-    colorDark: { value: new THREE.Color(0x0b1526) },
-    colorLight: { value: new THREE.Color(0x3b82d6) },
-    colorBg: { value: new THREE.Color(0xdc2b1e) },
+    colorDark: { value: new THREE.Color(0x000000) },
+    colorLight: { value: new THREE.Color(0xffffff) },
+    colorBg: { value: new THREE.Color(0x2a2a2a) },
   },
   vertexShader: `
     varying vec2 vUv;
@@ -42,6 +42,10 @@ const DuotoneShader = {
     void main() {
       vec4 texel = texture2D(tDiffuse, vUv);
       float lum = dot(texel.rgb, vec3(0.299, 0.587, 0.114));
+      // No S-curve (that's what was crushing shadows to black) — just a
+      // gamma lift so the scene's fairly dim lighting still reads as a
+      // soft, low-contrast gray rather than near-black.
+      lum = pow(clamp(lum * 2.6, 0.0, 1.0), 0.6);
       vec3 subject = mix(colorDark, colorLight, lum);
       gl_FragColor = vec4(mix(colorBg, subject, texel.a), 1.0);
     }
