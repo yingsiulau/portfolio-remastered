@@ -12,9 +12,10 @@ import { AsciiEffect } from 'three/examples/jsm/effects/AsciiEffect.js';
 
 export const FILTERS = ['none', 'ascii', 'pixel', 'duotone', 'thermal', 'invert'];
 
-// Plain color negative. Forces full opacity so the transparent background
-// (black) inverts to white too, like a photographic negative, rather than
-// staying transparent over the page's own dark background.
+// Color negative, but the background is forced to white *before*
+// inverting (via alpha — the scene background is transparent, not
+// actually white) so it lands on black afterwards, instead of the
+// transparent background inverting to white like the subject's darks do.
 const InvertShader = {
   uniforms: {
     tDiffuse: { value: null },
@@ -31,7 +32,8 @@ const InvertShader = {
     varying vec2 vUv;
     void main() {
       vec4 texel = texture2D(tDiffuse, vUv);
-      gl_FragColor = vec4(1.0 - texel.rgb, 1.0);
+      vec3 preInvert = mix(vec3(1.0), texel.rgb, texel.a);
+      gl_FragColor = vec4(1.0 - preInvert, 1.0);
     }
   `,
 };
