@@ -94,7 +94,7 @@ export default function StudioInvitation() {
 
         {/* Footer plaque */}
         <div className="w-full mt-24 pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-mono text-white/40">
-          <span>© 2025 Ying Siu Lau. All rights reserved.</span>
+          <span>© 2025 Yingsiu Lau. All rights reserved.</span>
           <span>Designed for Canvas &amp; Silicon.</span>
         </div>
       </section>

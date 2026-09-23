@@ -16,7 +16,7 @@ export default function Nav() {
     >
       <div className="flex flex-col">
         <Link to="/#top" className="font-display text-xl md:text-2xl tracking-tight font-light italic leading-none">
-          Ying Siu Lau
+          Yingsiu Lau
         </Link>
         <span className="text-[9px] uppercase tracking-[0.2em] font-mono text-white/60 mt-1">
           Fine Art × Creative Code
