@@ -32,8 +32,18 @@ const InvertShader = {
     varying vec2 vUv;
     void main() {
       vec4 texel = texture2D(tDiffuse, vUv);
-      vec3 preInvert = mix(vec3(1.0), texel.rgb, texel.a);
-      gl_FragColor = vec4(1.0 - preInvert, 1.0);
+      // Most of the model sits in shadow (near-black, near-gray), which
+      // is exactly the color that crushes to flat, colorless white once
+      // inverted — lift it first so it has some tone left to invert into.
+      vec3 lifted = pow(clamp(texel.rgb, 0.0, 1.0), vec3(0.4));
+      vec3 preInvert = mix(vec3(1.0), lifted, texel.a);
+      vec3 color = 1.0 - preInvert;
+
+      // Saturation boost so whatever color survives reads vividly.
+      float lum = dot(color, vec3(0.299, 0.587, 0.114));
+      color = clamp(mix(vec3(lum), color, 2.4), 0.0, 1.0);
+
+      gl_FragColor = vec4(color, 1.0);
     }
   `,
 };
