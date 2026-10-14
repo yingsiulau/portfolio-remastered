@@ -10,7 +10,71 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { RenderPixelatedPass } from 'three/examples/jsm/postprocessing/RenderPixelatedPass.js';
 import { AsciiEffect } from 'three/examples/jsm/effects/AsciiEffect.js';
 
-export const FILTERS = ['none', 'ascii', 'pixel', 'duotone', 'thermal', 'invert'];
+export const FILTERS = ['none', 'ascii', 'pixel', 'dither', 'duotone', 'thermal', 'invert'];
+
+// 1-bit ordered dithering (8x8 Bayer matrix) on a coarse pixel grid — the
+// "Dither Boy" look. Error-diffusion dithers (Floyd-Steinberg, Atkinson)
+// are sequential and don't map to a fragment shader, so ordered dithering
+// is the real-time option. `resolution` is the canvas size in CSS pixels
+// and `cellSize` the dither cell in CSS pixels, so the dot density stays
+// the same regardless of devicePixelRatio. Background is a flat dark
+// (alpha-masked, like the duotone) and the subject's luminance is
+// remapped to start above zero so deep shadows keep a sparse dot pattern
+// instead of vanishing into the backdrop.
+const DitherShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    resolution: { value: new THREE.Vector2(1, 1) },
+    cellSize: { value: 2.0 },
+    colorDark: { value: new THREE.Color(0x14141a) },
+    colorLight: { value: new THREE.Color(0xf9f6f0) },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform vec2 resolution;
+    uniform float cellSize;
+    uniform vec3 colorDark;
+    uniform vec3 colorLight;
+    varying vec2 vUv;
+
+    float bayer2(vec2 b) {
+      return 2.0 * b.x + 3.0 * b.y - 4.0 * b.x * b.y;
+    }
+
+    float bayer8(vec2 cell) {
+      vec2 c = mod(floor(cell), 8.0);
+      vec2 b0 = mod(c, 2.0);
+      vec2 b1 = mod(floor(c / 2.0), 2.0);
+      vec2 b2 = floor(c / 4.0);
+      return (16.0 * bayer2(b0) + 4.0 * bayer2(b1) + bayer2(b2)) / 64.0;
+    }
+
+    void main() {
+      vec2 cell = floor(vUv * resolution / cellSize);
+      vec2 snappedUv = (cell + 0.5) * cellSize / resolution;
+      vec4 texel = texture2D(tDiffuse, snappedUv);
+
+      float lum = dot(texel.rgb, vec3(0.299, 0.587, 0.114));
+      // Scene is linear and fairly dim: go to perceptual space and lift,
+      // then keep a floor so shadows still get a few dots.
+      lum = clamp(pow(max(lum, 0.0), 0.4545) * 1.1, 0.0, 1.0);
+      lum = mix(0.12, 1.0, lum);
+
+      float threshold = bayer8(cell) + 0.5 / 64.0;
+      float isSubject = step(0.5, texel.a);
+      float on = step(threshold, lum) * isSubject;
+
+      gl_FragColor = vec4(mix(colorDark, colorLight, on), 1.0);
+    }
+  `,
+};
 
 // Color negative, but the background is forced to white *before*
 // inverting (via alpha — the scene background is transparent, not
@@ -221,9 +285,17 @@ export default function ModelViewer({ src, filter = 'none' }) {
     composerInvert.addPass(invertPass);
     composerInvert.addPass(new OutputPass());
 
+    const ditherPass = new ShaderPass(DitherShader);
+    ditherPass.uniforms.resolution.value.set(container.clientWidth, container.clientHeight);
+    const composerDither = new EffectComposer(renderer);
+    composerDither.addPass(new RenderPass(scene, camera));
+    composerDither.addPass(ditherPass);
+    composerDither.addPass(new OutputPass());
+
     const composers = {
       none: composerNone,
       pixel: composerPixel,
+      dither: composerDither,
       duotone: composerDuotone,
       thermal: composerThermal,
       invert: composerInvert,
@@ -334,6 +406,7 @@ export default function ModelViewer({ src, filter = 'none' }) {
       renderer.setSize(w, h);
       Object.values(composers).forEach((c) => c.setSize(w, h));
       asciiEffect.setSize(w, h);
+      ditherPass.uniforms.resolution.value.set(w, h);
     };
     window.addEventListener('resize', onResize);
 

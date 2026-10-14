@@ -10,6 +10,7 @@ const FILTER_LABELS = {
   none: 'None',
   ascii: 'ASCII',
   pixel: '8-bit',
+  dither: 'Dither',
   duotone: 'Duotone',
   thermal: 'Brockhampton',
   invert: 'Invert',
